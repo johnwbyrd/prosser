@@ -1,11 +1,12 @@
+# Project Structure
+
 ```
 bedrock-mcp-proxy/
 │
 ├── .github/                           # GitHub configurations
 │   ├── workflows/                     # CI/CD workflows
-│   │   ├── build.yml                  # Build pipeline
-│   │   ├── test.yml                   # Test pipeline
-│   │   └── deploy.yml                 # Deployment pipeline
+│   │   ├── build.yml                  # Build and test workflow
+│   │   └── deploy.yml                 # Deployment workflow
 │   └── CODEOWNERS                     # Code ownership definitions
 │
 ├── docs/                              # Documentation
@@ -29,30 +30,41 @@ bedrock-mcp-proxy/
 │       ├── iam.yaml                   # IAM roles and policies
 │       └── custom-domain.yaml         # Route 53 and domain configuration
 │
+├── templates/                         # Client configuration templates
+│   ├── cursor/                        # Cursor IDE templates
+│   │   └── mcp.json                   # MCP configuration for Cursor
+│   └── vscode/                        # VS Code templates
+│       └── mcp.json                   # MCP configuration for VS Code
+│
 ├── src/                               # Source code
-│   ├── common/                        # Shared code
+│   ├── common/                        # Shared utilities
 │   │   ├── config.js                  # Configuration management
 │   │   ├── logger.js                  # Logging utilities
 │   │   └── errors.js                  # Error handling utilities
 │   │
-│   ├── openai-proxy/                  # OpenAI API compatibility layer
-│   │   ├── index.js                   # Main entry point
+│   ├── functions/                     # Lambda function entry points
+│   │   ├── api/                       # API handlers (optimized for cold starts)
+│   │   │   ├── openai-proxy.js        # OpenAI API compatibility handler
+│   │   │   └── mcp-server.js          # MCP server handler
+│   │   └── middlewares/               # Lambda function middlewares
+│   │       ├── auth.js                # Authentication middleware
+│   │       ├── error-handler.js       # Error handling middleware
+│   │       └── cors.js                # CORS middleware
+│   │
+│   ├── openai-proxy/                  # OpenAI API compatibility service
 │   │   ├── routes/                    # API route handlers
 │   │   │   ├── chat.js                # Chat completions endpoint
 │   │   │   ├── completions.js         # Completions endpoint
 │   │   │   └── models.js              # Models endpoint
-│   │   ├── middleware/                # API middleware
-│   │   │   ├── auth.js                # Authentication middleware
-│   │   │   └── validation.js          # Request validation middleware
 │   │   └── transformers/              # Request/response transformers
 │   │       ├── bedrock.js             # Bedrock-specific transformations
 │   │       └── openai.js              # OpenAI-specific transformations
 │   │
 │   ├── mcp-server/                    # MCP server implementation
-│   │   ├── index.js                   # Main entry point
-│   │   ├── server.js                  # Server initialization
 │   │   ├── capabilities.js            # Capability definitions
 │   │   ├── tools/                     # Tool implementations
+│   │   │   ├── filesystem/            # Filesystem tools
+│   │   │   ├── command/               # Command execution tools
 │   │   │   ├── bedrock-chat.js        # Bedrock chat tool
 │   │   │   └── bedrock-completion.js  # Bedrock completion tool
 │   │   ├── transport/                 # Transport implementations
@@ -86,10 +98,55 @@ bedrock-mcp-proxy/
 │   ├── local-test.sh                  # Local testing script
 │   └── setup-dev.sh                   # Development environment setup
 │
+├── layers/                            # Lambda layers for dependency optimization
+│   ├── core-dependencies/             # Shared dependencies for all functions
+│   │   └── package.json               # Dependencies specification
+│   └── mcp-dependencies/              # MCP-specific dependencies
+│       └── package.json               # Dependencies specification
+│
 ├── .eslintrc.js                       # ESLint configuration
 ├── .gitignore                         # Git ignore file
+├── jest.config.js                     # Jest test configuration
 ├── package.json                       # Node.js package configuration
 ├── samconfig.toml                     # SAM CLI configuration
 ├── README.md                          # Project overview
 └── LICENSE                            # Project license
 ```
+
+## Key Design Considerations
+
+### Lambda Function Organization
+- Lambda functions are organized to minimize cold starts
+- Common dependencies are separated into layers for optimization
+- Core functionality is organized into well-defined modules
+
+### API Gateway Integration
+- Single API Gateway with multiple routes for both OpenAI API and MCP server
+- Custom domain support for friendly URLs
+- Appropriate CORS configuration for client integration
+
+### Client Integration
+- Configuration templates for Cursor and VS Code
+- Clear separation between server-side implementation and client configuration
+- Simplified setup process with ready-to-use mcp.json templates
+- Sample configurations for different usage scenarios
+
+### Performance Optimization
+- Minimal dependencies in each Lambda function
+- Efficient request handling for low latency
+- Shared layers for common dependencies
+- Stateless design for horizontal scaling
+
+### Security Architecture
+- Appropriate IAM roles with least privilege
+- API key authentication
+- Request validation
+- Secure handling of credentials and secrets
+
+### Deployment Strategy
+- AWS SAM for infrastructure as code
+- Environment-specific parameters
+- CI/CD integration through GitHub Actions
+- Simple deployment and cleanup scripts
+
+This structure prioritizes serverless performance while maintaining clean separation of concerns and follows Node.js best practices for maintainability and testability.
