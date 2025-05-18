@@ -46,8 +46,20 @@ This service is built using AWS serverless technologies:
 
 3. Deploy to AWS:
    ```
-   npm run deploy:dev
+   npm run deploy
    ```
+
+## Configuration
+
+Configuration is handled through the `template.yaml` SAM template. Edit this file to adjust:
+
+- Model mappings
+- Default parameters
+- API Gateway settings
+- Lambda function configuration
+- Database settings
+
+No complex configuration management or environment switching - just edit the template and deploy.
 
 ## Usage
 
@@ -84,29 +96,14 @@ npm start
 
 ### Testing
 
-Run unit tests:
+Run tests:
 ```
-npm run test:unit
-```
-
-Run integration tests:
-```
-npm run test:integration
-```
-
-Run load tests:
-```
-npm run test:load
+npm test
 ```
 
 ### Deployment
 
-Deploy to development:
+Deploy the service:
 ```
-npm run deploy:dev
-```
-
-Deploy to production:
-```
-npm run deploy:prod
+npm run deploy
 ```

@@ -1,13 +1,11 @@
 #!/bin/bash
-# Deploy script for AWS Bedrock OpenAI-compatible proxy
+# Simple deploy script for Prosser
 
 set -e  # Exit on any error
 
-# Default environment is dev
-ENVIRONMENT=${1:-dev}
-STACK_NAME="bedrock-proxy-$ENVIRONMENT"
+STACK_NAME="prosser"
 
-echo "Deploying to $ENVIRONMENT environment..."
+echo "Deploying Prosser..."
 
 # Validate template
 echo "Validating SAM template..."
@@ -19,18 +17,8 @@ sam build
 
 # Deploy 
 echo "Deploying stack $STACK_NAME..."
-if [ "$ENVIRONMENT" = "production" ]; then
-  # Deploy with production parameters
-  sam deploy \
-    --stack-name $STACK_NAME \
-    --no-confirm-changeset \
-    --parameter-overrides "$(cat infra/parameters/prod.json)"
-else
-  # Deploy with dev parameters
-  sam deploy \
-    --stack-name $STACK_NAME \
-    --no-confirm-changeset \
-    --parameter-overrides "$(cat infra/parameters/dev.json)"
-fi
+sam deploy \
+  --stack-name $STACK_NAME \
+  --no-confirm-changeset
 
-echo "Deployment to $ENVIRONMENT completed!" 
+echo "Deployment completed!" 
