@@ -5,7 +5,7 @@ Resources:
   BedrockProxyApi:
     Type: AWS::Serverless::Api
     Properties:
-      StageName: !Ref Environment
+      StageName: "v1"
       EndpointConfiguration: 
         Type: REGIONAL
       Auth:

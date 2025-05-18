@@ -4,6 +4,7 @@
 - This document outlines the serverless infrastructure design for the AWS Bedrock MCP and OpenAI API Proxy
 - Infrastructure follows a zero-cost-at-rest model with AWS Lambda and API Gateway
 - All components are deployed via AWS SAM templates
+- Single deployment approach for simplified management
 
 ## Core Architecture
 
@@ -124,9 +125,5 @@ Resources:
 ### SAM Template Structure
 - Main template for core components
 - Nested stacks for complex resources
-- Environment-specific parameters
-
-### CI/CD Integration
-- GitHub Actions workflows for automated deployment
-- Testing before deployment
-- Staged rollout process 
+- Single consistent deployment configuration
+- Simplified deployment process 

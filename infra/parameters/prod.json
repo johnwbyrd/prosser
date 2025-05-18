@@ -1,6 +1,0 @@
-{
-  "Parameters": {
-    "Environment": "production",
-    "DeploymentType": "CANARY"
-  }
-} 

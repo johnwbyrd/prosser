@@ -2,7 +2,7 @@ version = 0.1
 [default]
 [default.global]
 [default.global.parameters]
-stack_name = "bedrock-proxy-dev"
+stack_name = "prosser"
 
 [default.build]
 [default.build.parameters]
@@ -14,7 +14,7 @@ parallel = true
 capabilities = "CAPABILITY_IAM CAPABILITY_NAMED_IAM"
 confirm_changeset = false
 resolve_s3 = true
-s3_prefix = "bedrock-proxy"
+s3_prefix = "prosser"
 region = "us-west-2"
 image_repositories = []
 
@@ -25,16 +25,4 @@ watch = true
 [default.local_start_api]
 [default.local_start_api.parameters]
 warm_containers = "EAGER"
-port = 3000
-
-[prod]
-[prod.deploy]
-[prod.deploy.parameters]
-stack_name = "bedrock-proxy-prod"
-capabilities = "CAPABILITY_IAM CAPABILITY_NAMED_IAM"
-confirm_changeset = true
-resolve_s3 = true
-s3_prefix = "bedrock-proxy"
-region = "us-west-2"
-image_repositories = []
-parameter_overrides = "Environment=\"production\" DeploymentType=\"CANARY\"" 
+port = 3000 

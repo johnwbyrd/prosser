@@ -1,5 +1,5 @@
 #!/bin/bash
-# Simple deploy script for Prosser
+# Simple deploy script for Prosser (single deployment approach)
 
 set -e  # Exit on any error
 
@@ -21,4 +21,5 @@ sam deploy \
   --stack-name $STACK_NAME \
   --no-confirm-changeset
 
-echo "Deployment completed!" 
+echo "Deployment completed!"
+echo "Your API is now available at the URL shown in the outputs above." 

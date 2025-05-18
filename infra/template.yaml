@@ -10,38 +10,205 @@ Globals:
       - x86_64
     Environment:
       Variables:
-        NODE_ENV: !Ref Environment
-
-Parameters:
-  Environment:
-    Type: String
-    Default: dev
-    AllowedValues:
-      - dev
-      - staging
-      - production
-    Description: Deployment environment
-
-  DeploymentType:
-    Type: String
-    Default: ALL_AT_ONCE
-    AllowedValues:
-      - ALL_AT_ONCE
-      - CANARY
-      - ROLLBACK
-      - COMPLETE
-    Description: Deployment type for API Gateway
+        NODE_ENV: "production"
 
 Resources:
-  # API Gateway will be defined here
+  # API Gateway Definition
+  BedrockProxyApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: "v1"
+      EndpointConfiguration: 
+        Type: REGIONAL
+      Auth:
+        ApiKeyRequired: true
+        UsagePlan:
+          Description: Usage plan for Bedrock Proxy API
+          Quota:
+            Limit: 10000
+            Period: MONTH
+          Throttle:
+            BurstLimit: 100
+            RateLimit: 50
+      MethodSettings:
+        - ResourcePath: '/*'
+          HttpMethod: '*'
+          MetricsEnabled: true
+          DataTraceEnabled: true
+          LoggingLevel: INFO
   
-  # Lambda Functions will be defined here
+  # Lambda Functions
+  OpenAIProxyFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../src/functions/api/
+      Handler: openai-proxy.handler
+      Description: Handles OpenAI API compatible requests
+      MemorySize: 256
+      Timeout: 30
+      Role: !GetAtt BedrockProxyLambdaRole.Arn
+      Environment:
+        Variables:
+          ACCOUNTS_TABLE: !Ref AccountsTable
+          SESSIONS_TABLE: !Ref SessionsTable
+          CACHE_TABLE: !Ref CacheTable
+      Events:
+        ApiEvent:
+          Type: Api
+          Properties:
+            RestApiId: !Ref BedrockProxyApi
+            Path: /v1/{proxy+}
+            Method: ANY
   
-  # DynamoDB Tables will be defined here
+  MCPServerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../src/functions/api/
+      Handler: mcp-server.handler
+      Description: Handles Model Context Protocol (MCP) requests
+      MemorySize: 256
+      Timeout: 900  # 15 minutes max for streaming responses
+      Role: !GetAtt BedrockProxyLambdaRole.Arn
+      Environment:
+        Variables:
+          ACCOUNTS_TABLE: !Ref AccountsTable
+          SESSIONS_TABLE: !Ref SessionsTable
+          CACHE_TABLE: !Ref CacheTable
+      Events:
+        ApiEvent:
+          Type: Api
+          Properties:
+            RestApiId: !Ref BedrockProxyApi
+            Path: /mcp/{proxy+}
+            Method: ANY
   
-  # IAM Roles will be defined here
+  # DynamoDB Tables
+  AccountsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: "prosser-accounts"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: accountId
+          AttributeType: S
+        - AttributeName: apiKey
+          AttributeType: S
+      KeySchema:
+        - AttributeName: accountId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: ApiKeyIndex
+          KeySchema:
+            - AttributeName: apiKey
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+
+  SessionsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: "prosser-sessions"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: sessionId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: sessionId
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: expiresAt
+        Enabled: true
+
+  CacheTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: "prosser-cache"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: cacheKey
+          AttributeType: S
+      KeySchema:
+        - AttributeName: cacheKey
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: expiresAt
+        Enabled: true
+  
+  # IAM Roles
+  BedrockProxyApiRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: "prosser-api-role"
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: apigateway.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs
+      Policies:
+        - PolicyName: InvokeLambda
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource: 
+                  - !GetAtt OpenAIProxyFunction.Arn
+                  - !GetAtt MCPServerFunction.Arn
+
+  BedrockProxyLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: "prosser-lambda-role"
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: BedrockAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - bedrock:InvokeModel
+                  - bedrock:InvokeModelWithResponseStream
+                Resource: '*'
+        - PolicyName: DynamoDBAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:Query
+                  - dynamodb:Scan
+                Resource:
+                  - !GetAtt AccountsTable.Arn
+                  - !GetAtt SessionsTable.Arn
+                  - !GetAtt CacheTable.Arn
+                  - !Sub ${AccountsTable.Arn}/index/*
 
 Outputs:
   ApiGatewayUrl:
     Description: URL of the API Gateway endpoint
-    Value: !Sub https://${BedrockProxyApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment} 
+    Value: !Sub https://${BedrockProxyApi}.execute-api.${AWS::Region}.amazonaws.com/v1
+  
+  OpenAIProxyFunction:
+    Description: ARN of the OpenAI Proxy Lambda function
+    Value: !GetAtt OpenAIProxyFunction.Arn
+  
+  MCPServerFunction:
+    Description: ARN of the MCP Server Lambda function
+    Value: !GetAtt MCPServerFunction.Arn 

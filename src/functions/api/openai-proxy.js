@@ -3,10 +3,10 @@
  */
 
 const { createLogger } = require('../../common/logger');
-const auth = require('../middlewares/auth');
-const errorHandler = require('../middlewares/error-handler');
-const cors = require('../middlewares/cors');
-const cache = require('../middlewares/cache');
+const auth = require('../middleware/auth');
+const errorHandler = require('../middleware/error-handler');
+const cors = require('../middleware/cors');
+const cache = require('../middleware/cache');
 
 // Routes
 const chatRoutes = require('../../openai-proxy/routes/chat');
@@ -25,7 +25,7 @@ exports.handler = async (event, context) => {
   logger.debug('Received API event', { path: event.path, method: event.httpMethod });
   
   try {
-    // Apply middlewares
+    // Apply middleware
     const req = await auth(event, context);
     await cors(req);
     await cache(req);

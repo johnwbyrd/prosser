@@ -51,7 +51,7 @@ This service is built using AWS serverless technologies:
 
 ## Configuration
 
-Configuration is handled through the `template.yaml` SAM template. Edit this file to adjust:
+Configuration is handled through the `infra/template.yaml` SAM template. Edit this file to adjust:
 
 - Model mappings
 - Default parameters

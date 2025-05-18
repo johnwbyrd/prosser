@@ -3,8 +3,8 @@
  */
 
 const DEFAULT_CONFIG = {
-  // Environment variables take precedence over defaults
-  environment: process.env.NODE_ENV || 'dev',
+  // Default to production environment
+  environment: 'production',
   logLevel: process.env.LOG_LEVEL || 'info',
   
   // API configuration
@@ -17,9 +17,9 @@ const DEFAULT_CONFIG = {
   // DynamoDB configuration
   dynamodb: {
     region: process.env.AWS_REGION || 'us-east-1',
-    accountsTable: process.env.ACCOUNTS_TABLE || 'bedrock-proxy-accounts',
-    sessionsTable: process.env.SESSIONS_TABLE || 'bedrock-proxy-sessions',
-    cacheTable: process.env.CACHE_TABLE || 'bedrock-proxy-cache',
+    accountsTable: process.env.ACCOUNTS_TABLE || 'prosser-accounts',
+    sessionsTable: process.env.SESSIONS_TABLE || 'prosser-sessions',
+    cacheTable: process.env.CACHE_TABLE || 'prosser-cache',
   },
   
   // Bedrock configuration
@@ -39,7 +39,7 @@ const DEFAULT_CONFIG = {
   // Security configuration
   security: {
     apiKeyLength: parseInt(process.env.API_KEY_LENGTH || '40', 10),
-    apiKeyPrefix: process.env.API_KEY_PREFIX || 'bproxy_',
+    apiKeyPrefix: process.env.API_KEY_PREFIX || 'prosser_',
     apiKeyExpiryDays: parseInt(process.env.API_KEY_EXPIRY_DAYS || '90', 10),
   },
 };
@@ -70,7 +70,7 @@ function get(key, defaultValue) {
  * @returns {boolean} True if in production
  */
 function isProduction() {
-  return get('environment') === 'production';
+  return true; // Always return true as we're using a production-only approach
 }
 
 /**
@@ -78,7 +78,7 @@ function isProduction() {
  * @returns {boolean} True if in development
  */
 function isDevelopment() {
-  return get('environment') === 'dev';
+  return false; // Always return false as we're using a production-only approach
 }
 
 module.exports = {
