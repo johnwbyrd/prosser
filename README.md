@@ -1,4 +1,4 @@
-# AWS Bedrock OpenAI-compatible API Proxy
+# Prosser: AWS Bedrock OpenAI-compatible API Proxy
 
 A serverless proxy service that provides OpenAI API compatibility for AWS Bedrock models.
 
@@ -35,8 +35,8 @@ This service is built using AWS serverless technologies:
 
 1. Clone the repository:
    ```
-   git clone https://github.com/yourusername/bedrock-openai-proxy.git
-   cd bedrock-openai-proxy
+   git clone https://github.com/johnbyrd/prosser.git
+   cd prosser
    ```
 
 2. Install dependencies:
@@ -113,4 +113,4 @@ npm run deploy:prod
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details. 
+This project is licensed under the GNU General Public License v3.0 - see the LICENSE file for details. 

@@ -1,5 +1,5 @@
 {
-  "name": "AWS Bedrock",
+  "name": "Prosser",
   "description": "AWS Bedrock integration for Cursor using MCP protocol",
   "version": "1.0.0",
   "protocol": "mcp",
@@ -43,6 +43,6 @@
   ],
   "auth": {
     "type": "api_key",
-    "instructions": "Enter your AWS Bedrock Proxy API key"
+    "instructions": "Enter your Prosser API key"
   }
 } 

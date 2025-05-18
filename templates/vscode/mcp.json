@@ -1,5 +1,5 @@
 {
-  "name": "AWS Bedrock",
+  "name": "Prosser",
   "description": "AWS Bedrock integration for VS Code using MCP protocol",
   "version": "1.0.0",
   "protocol": "mcp",
@@ -43,15 +43,15 @@
   ],
   "auth": {
     "type": "api_key",
-    "instructions": "Enter your AWS Bedrock Proxy API key"
+    "instructions": "Enter your Prosser API key"
   },
   "vscode": {
-    "extension": "aws-bedrock-mcp",
+    "extension": "prosser-mcp",
     "configuration": {
       "api_key": {
         "type": "string",
         "default": "",
-        "description": "AWS Bedrock Proxy API Key"
+        "description": "Prosser API Key"
       },
       "default_model": {
         "type": "string", 

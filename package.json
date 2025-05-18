@@ -1,5 +1,5 @@
 {
-  "name": "bedrock-openai-proxy",
+  "name": "prosser",
   "version": "1.0.0",
   "description": "AWS Bedrock OpenAI-compatible API proxy service",
   "main": "src/index.js",
@@ -19,7 +19,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/yourusername/bedrock-openai-proxy.git"
+    "url": "git+https://github.com/johnbyrd/prosser.git"
   },
   "keywords": [
     "aws",
@@ -29,8 +29,8 @@
     "proxy",
     "serverless"
   ],
-  "author": "Your Name",
-  "license": "MIT",
+  "author": "John Byrd",
+  "license": "GPL-3.0",
   "dependencies": {
     "@aws-sdk/client-bedrock-runtime": "^3.511.0",
     "@aws-sdk/client-dynamodb": "^3.511.0",
