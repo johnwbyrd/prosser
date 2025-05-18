@@ -27,6 +27,7 @@ bedrock-mcp-proxy/
 │   │   └── prod.json                  # Production parameters
 │   └── resources/                     # Additional CloudFormation resources
 │       ├── api-gateway.yaml           # API Gateway resources
+│       ├── dynamodb.yaml              # DynamoDB tables definition
 │       ├── iam.yaml                   # IAM roles and policies
 │       └── custom-domain.yaml         # Route 53 and domain configuration
 │
@@ -40,7 +41,14 @@ bedrock-mcp-proxy/
 │   ├── common/                        # Shared utilities
 │   │   ├── config.js                  # Configuration management
 │   │   ├── logger.js                  # Logging utilities
-│   │   └── errors.js                  # Error handling utilities
+│   │   ├── errors.js                  # Error handling utilities
+│   │   ├── streaming.js               # Streaming utilities for Lambda
+│   │   └── cache.js                   # Response caching utilities
+│   │
+│   ├── db/                            # Database integration
+│   │   ├── dynamodb.js                # DynamoDB client and helpers
+│   │   ├── session-store.js           # Session persistence implementation
+│   │   └── cache-store.js             # Response cache implementation
 │   │
 │   ├── functions/                     # Lambda function entry points
 │   │   ├── api/                       # API handlers (optimized for cold starts)
@@ -49,7 +57,8 @@ bedrock-mcp-proxy/
 │   │   └── middlewares/               # Lambda function middlewares
 │   │       ├── auth.js                # Authentication middleware
 │   │       ├── error-handler.js       # Error handling middleware
-│   │       └── cors.js                # CORS middleware
+│   │       ├── cors.js                # CORS middleware
+│   │       └── cache.js               # Response caching middleware
 │   │
 │   ├── openai-proxy/                  # OpenAI API compatibility service
 │   │   ├── routes/                    # API route handlers
@@ -58,7 +67,8 @@ bedrock-mcp-proxy/
 │   │   │   └── models.js              # Models endpoint
 │   │   └── transformers/              # Request/response transformers
 │   │       ├── bedrock.js             # Bedrock-specific transformations
-│   │       └── openai.js              # OpenAI-specific transformations
+│   │       ├── openai.js              # OpenAI-specific transformations
+│   │       └── streaming.js           # Streaming response transformations
 │   │
 │   ├── mcp-server/                    # MCP server implementation
 │   │   ├── capabilities.js            # Capability definitions
@@ -131,11 +141,34 @@ bedrock-mcp-proxy/
 - Simplified setup process with ready-to-use mcp.json templates
 - Sample configurations for different usage scenarios
 
+### Lambda Response Streaming
+
+- Leverages AWS Lambda response streaming for long-running model responses
+- Supports execution up to 15 minutes while maintaining serverless benefits
+- Enables proper streaming for both OpenAI API and MCP protocols
+- Implementation using AWS SDK v3 streaming capabilities
+
+### Request Caching
+
+- DynamoDB-based response caching for frequently requested queries
+- TTL-based automatic cache expiration
+- Zero-cost-at-rest implementation using on-demand capacity
+- Configurable caching strategies based on request types
+
+### Session Persistence
+
+- Stateless Lambda functions with external session storage
+- DynamoDB-backed session persistence for MCP protocol
+- Automatic cleanup of expired sessions
+- Efficient lookup patterns for session retrieval
+
 ### Performance Optimization
 - Minimal dependencies in each Lambda function
 - Efficient request handling for low latency
 - Shared layers for common dependencies
 - Stateless design for horizontal scaling
+- Stream processing to handle long-running model responses
+- Cache utilization to reduce duplicate model calls
 
 ### Security Architecture
 - Appropriate IAM roles with least privilege

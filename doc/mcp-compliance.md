@@ -1,139 +1,72 @@
 # MCP Protocol Compliance
 
 ## Overview
-- Model Context Protocol (MCP) purpose
-- Protocol version support
-- Compliance goals
+- This document outlines our compliance with the Model Context Protocol (MCP) specification
+- Official MCP specification: [Model Context Protocol GitHub](https://github.com/ModelContext/protocol)
+- Our implementation adheres to the standard with specific extensions noted below
 
-## Core MCP Concepts
-
-### Protocol Architecture
-- MCP server model
-- Transport mechanisms
-- Message format overview
-- Session management
-
-### Capabilities Model
-- Capability declaration
-- Tool registration
-- Discovery mechanism
-- Capability versioning
-
-## Implementation Strategy
+## Core Protocol Compliance
 
 ### Transport Layer
-- HTTP transport implementation
-- Server-Sent Events (SSE) implementation
-- WebSocket considerations (if applicable)
-- Connection management
+- **Standard Compliance**: Full compliance with HTTP and SSE transport mechanisms as defined in the specification
+- **Deviation**: Connection management implemented through AWS Lambda response streaming
+  - Enables long-running connections (up to 15 minutes) in serverless context
+  - Uses API Gateway + Lambda streaming response instead of traditional server SSE
+  - Client experience remains identical to standard implementation
 
 ### Session Management
-- Session creation flows
-- Session persistence approach
-- Session expiration policy
-- State management
+- **Standard Compliance**: Adheres to session creation and lifecycle as specified
+- **Deviation**: Session state persistence implemented across Lambda invocations
+  - Session state stored in DynamoDB with on-demand capacity
+  - Maintains stateless Lambda functions for scalability
+  - Transparent to client implementation
 
-### Capability Registration
-- Static vs. dynamic capabilities
-- Required vs. optional capabilities
-- Capability definition format
-- Capability discovery endpoints
+### Capability Advertisement
+- **Standard Compliance**: All standard capability advertisement mechanisms implemented
+- **Deviation**: None
 
-## Tool Implementations
+### Message Format
+- **Standard Compliance**: All message formats follow the specification exactly
+- **Deviation**: None
+
+## Tool Implementation Compliance
 
 ### Filesystem Tools
-- File reading/writing functionality
-- Directory listing capabilities
-- File search implementation
-- Path resolution and security
+- **Standard Compliance**: Uses official `@modelcontextprotocol/server-filesystem` implementation
+- **Deviation**: Added security boundaries for multi-tenant environments
 
-### Command Execution Tools
-- Command validation approach
-- Execution environment
-- Output streaming
-- Error handling
+### Command Execution
+- **Standard Compliance**: Uses official `@modelcontextprotocol/server-command` implementation
+- **Deviation**: Added command whitelisting and execution restrictions
 
-### Bedrock AI Tools
-- Chat completion tool
-- Text completion tool
-- Embedding tool (if applicable)
-- Image generation tool (if applicable)
+### Content Generation
+- **Standard Compliance**: Follows MCP tool specification format
+- **Deviation**: Implementation connects to AWS Bedrock instead of local models
+  - Streaming responses from Bedrock piped through Lambda response streaming
+  - Supports full 15-minute execution time for long generations
 
-### Development Context Tools
-- Project structure analysis
-- Code search functionality
-- Symbol lookup capabilities
-- Dependency analysis
+## Protocol Extensions
 
-## Security Considerations
+### Authentication Extensions
+- Extended authentication to support AWS IAM in addition to API keys
+- These extensions do not modify standard protocol flows
 
-### Permission Model
-- User consent requirements
-- Permission prompt implementation
-- Scope limitations
-- Audit logging
+### Telemetry Extensions
+- Added token usage tracking capabilities
+- Extensions use the standard extension mechanism defined in the spec
 
-### Access Controls
-- Filesystem boundaries
-- Command execution restrictions
-- Client authentication
-- Request validation
+### Multi-Model Support
+- Added model selection capabilities
+- Implemented as standard tools following the protocol specification
 
-## Testing and Validation
+## Client Compatibility Notes
 
-### Compliance Testing
-- Automated test suite
-- Protocol conformance checks
-- Edge case handling
-- Error response validation
+- Fully compatible with standard MCP clients (Cursor, VS Code)
+- No client-side modifications required to use standard functionality
+- Extended functionality available through standard configuration mechanisms
 
-### Client Compatibility
-- Cursor IDE compatibility testing
-- VS Code compatibility testing
-- Client-specific configuration needs
-- Integration testing strategy
+## References
 
-## MCP Extensions
-
-### Custom Capabilities
-- Extension protocol approach
-- Non-standard capabilities
-- Versioning strategy
-- Fallback handling
-
-### Future Protocol Evolution
-- Handling protocol updates
-- Backward compatibility
-- Feature detection
-- Migration strategy
-
-## Client Templates
-
-### Cursor Configuration
-- mcp.json structure
-- Configuration options
-- Environment-specific settings
-- Example configurations
-
-### VS Code Configuration
-- mcp.json structure
-- Extension-specific settings
-- Configuration options
-- Example configurations
-
-## Appendix
-
-### Protocol Reference
-- MCP specification references
-- Schema definitions
-- Message format examples
-
-### Debugging Tools
-- Protocol inspection utilities
-- Testing tools
-- Validation resources
-
-### Reference Implementations
-- Official MCP implementation links
-- Community implementation references
-- Integration examples 
+- [Model Context Protocol Specification](https://github.com/ModelContext/protocol)
+- [Official MCP Server Implementations](https://github.com/ModelContext)
+- [AWS Lambda Response Streaming](https://docs.aws.amazon.com/lambda/latest/dg/configuration-response-streaming.html) 
