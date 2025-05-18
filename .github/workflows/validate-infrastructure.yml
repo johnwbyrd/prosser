@@ -1,0 +1,60 @@
+name: Validate Infrastructure
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'template.yaml'
+      - 'infrastructure/**'
+      
+  push:
+    branches:
+      - '**'
+      - '!main'
+    paths:
+      - 'template.yaml'
+      - 'infrastructure/**'
+
+permissions:
+  contents: read
+
+jobs:
+  validate-templates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+          
+      - name: Install AWS SAM CLI
+        uses: aws-actions/setup-sam@v2
+          
+      - name: Validate SAM template
+        run: sam validate
+        
+      - name: Install cfn-lint
+        run: pip install cfn-lint
+        
+      - name: Run cfn-lint
+        run: cfn-lint template.yaml
+        
+      - name: Install cfn-nag
+        run: gem install cfn-nag
+        
+      - name: Run cfn-nag
+        run: cfn_nag_scan --input-path template.yaml
+        
+  iam-policy-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Install policy-sentry
+        run: pip install policy-sentry
+        
+      - name: Analyze IAM permissions
+        run: |
+          find . -name "*.json" -type f -exec grep -l "Statement" {} \; | xargs -I{} sh -c 'echo "Analyzing {}" && cat {} | policy_sentry_analyze' 

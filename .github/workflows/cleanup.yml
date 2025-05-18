@@ -1,0 +1,68 @@
+name: Cleanup Resources
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to clean up'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+  pull_request:
+    types: [closed]
+    
+permissions:
+  id-token: write   # Required for OIDC
+  contents: read    # Required to checkout code
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    # Only run on PR close if it's not merged to avoid accidental deletions
+    if: github.event_name != 'pull_request' || github.event.pull_request.merged != true
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set environment variables
+        run: |
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            # For PRs, use the PR number as environment suffix
+            echo "STACK_NAME=bedrock-proxy-pr-${{ github.event.pull_request.number }}" >> $GITHUB_ENV
+          else
+            # For manual runs, use the selected environment
+            echo "STACK_NAME=bedrock-proxy-${{ github.event.inputs.environment }}" >> $GITHUB_ENV
+          fi
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: us-east-1
+          
+      - name: Delete CloudFormation stack
+        run: |
+          # Check if stack exists first
+          if aws cloudformation describe-stacks --stack-name $STACK_NAME 2>/dev/null; then
+            echo "Deleting stack $STACK_NAME"
+            aws cloudformation delete-stack --stack-name $STACK_NAME
+            
+            echo "Waiting for stack deletion to complete..."
+            aws cloudformation wait stack-delete-complete --stack-name $STACK_NAME
+          else
+            echo "Stack $STACK_NAME does not exist"
+          fi
+          
+      - name: Cleanup S3 artifacts
+        run: |
+          # Find and empty the deployment bucket
+          BUCKET_NAME=$(aws s3 ls | grep "bedrock-proxy-artifacts-${{ github.event.inputs.environment || 'pr' }}" | awk '{print $3}')
+          
+          if [ ! -z "$BUCKET_NAME" ]; then
+            echo "Cleaning up bucket $BUCKET_NAME"
+            aws s3 rm s3://$BUCKET_NAME --recursive
+          else
+            echo "No matching artifact bucket found"
+          fi 

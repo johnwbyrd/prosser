@@ -1,0 +1,166 @@
+name: Deploy to Environment
+
+on:
+  # For staging
+  push:
+    branches:
+      - 'release/**'
+  # For production
+  release:
+    types: [published]
+  # Manual trigger with environment selection
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+
+permissions:
+  id-token: write   # Required for OIDC
+  contents: read    # Required to checkout code
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    # Determine environment from trigger
+    env:
+      DEPLOY_ENV: ${{ github.event_name == 'release' && 'production' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment) || 'staging' }}
+      
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          
+      - name: Set deployment variables
+        id: vars
+        run: |
+          echo "Environment: $DEPLOY_ENV"
+          
+          if [ "$DEPLOY_ENV" == "production" ]; then
+            echo "STACK_NAME=bedrock-proxy-prod" >> $GITHUB_ENV
+            echo "IS_CANARY=true" >> $GITHUB_ENV
+            echo "NEEDS_BACKUP=true" >> $GITHUB_ENV
+          else
+            echo "STACK_NAME=bedrock-proxy-staging" >> $GITHUB_ENV
+            echo "IS_CANARY=false" >> $GITHUB_ENV
+            echo "NEEDS_BACKUP=false" >> $GITHUB_ENV
+          fi
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Build
+        run: npm run build:production
+        
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: us-east-1
+          
+      # Create backups for production only
+      - name: Create resource backups
+        if: env.NEEDS_BACKUP == 'true'
+        run: |
+          aws dynamodb create-backup \
+            --table-name bedrock-proxy-accounts \
+            --backup-name "pre-deploy-$(date +%Y%m%d-%H%M%S)"
+          
+      # Configure alarms for production canary deployment
+      - name: Configure deployment monitoring
+        if: env.IS_CANARY == 'true'
+        run: |
+          aws cloudwatch put-metric-alarm \
+            --alarm-name "bedrock-proxy-deployment-alarm" \
+            --metric-name "5XXError" \
+            --namespace "AWS/ApiGateway" \
+            --statistic "Sum" \
+            --period 60 \
+            --evaluation-periods 2 \
+            --threshold 5 \
+            --comparison-operator "GreaterThanThreshold" \
+            --alarm-actions "${{ secrets.ROLLBACK_SNS_TOPIC }}"
+          
+      # Deploy with or without canary based on environment
+      - name: Deploy with SAM
+        run: |
+          sam build
+          
+          if [ "$IS_CANARY" == "true" ]; then
+            echo "Deploying canary to $STACK_NAME"
+            sam deploy \
+              --stack-name $STACK_NAME \
+              --no-confirm-changeset \
+              --parameter-overrides "DeploymentType=CANARY Environment=$DEPLOY_ENV"
+          else
+            echo "Deploying to $STACK_NAME"
+            sam deploy \
+              --stack-name $STACK_NAME \
+              --no-confirm-changeset \
+              --parameter-overrides "Environment=$DEPLOY_ENV"
+          fi
+          
+      # Monitor deployment for production
+      - name: Monitor deployment
+        if: env.IS_CANARY == 'true'
+        run: |
+          echo "Monitoring deployment for 5 minutes..."
+          sleep 300
+          
+          ALARM_STATE=$(aws cloudwatch describe-alarms \
+            --alarm-names "bedrock-proxy-deployment-alarm" \
+            --query "MetricAlarms[0].StateValue" \
+            --output text)
+            
+          if [ "$ALARM_STATE" = "ALARM" ]; then
+            echo "Deployment has issues, initiating rollback"
+            exit 1
+          fi
+          
+      # Complete canary deployment for production
+      - name: Complete canary shift
+        if: env.IS_CANARY == 'true' && success()
+        run: |
+          sam deploy \
+            --stack-name $STACK_NAME \
+            --no-confirm-changeset \
+            --parameter-overrides "DeploymentType=COMPLETE Environment=$DEPLOY_ENV"
+            
+      # Rollback on failure for production
+      - name: Rollback on failure
+        if: env.IS_CANARY == 'true' && failure()
+        run: |
+          sam deploy \
+            --stack-name $STACK_NAME \
+            --no-confirm-changeset \
+            --parameter-overrides "DeploymentType=ROLLBACK Environment=$DEPLOY_ENV"
+          
+      # Run tests for all environments
+      - name: Run integration tests
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          TEST_ACCOUNT_ID: ${{ secrets.TEST_ACCOUNT_ID }}
+        run: npm run test:integration
+        
+      # Run load tests for staging environment
+      - name: Run load tests
+        if: env.DEPLOY_ENV == 'staging'
+        run: npm run test:load
+        
+      # Report deployment metrics to CloudWatch
+      - name: Report metrics to CloudWatch
+        run: |
+          aws cloudwatch put-metric-data \
+            --namespace BedrockProxy \
+            --metric-name DeploymentSuccess \
+            --dimensions Environment=$DEPLOY_ENV \
+            --value 1 

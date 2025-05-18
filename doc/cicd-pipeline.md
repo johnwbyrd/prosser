@@ -1,138 +1,159 @@
 # CI/CD Pipeline Design
 
 ## Overview
-- CI/CD philosophy
-- Pipeline goals
-- Integration with GitHub workflows
+This document outlines the GitHub Actions workflows required for the AWS Bedrock OpenAI-compatible API proxy service, detailing each action's responsibilities and required permissions.
 
-## Development Workflow
+## GitHub Actions Workflow Components
 
-### Branch Strategy
-- Main branch protection
-- Feature branch approach
-- Release branch management
-- Hotfix process
+### 1. Code Validation Workflow
+**Trigger**: Pull requests to main, pushes to feature branches
 
-### Pull Request Process
-- PR template
-- Review requirements
-- Automated checks
-- Merge criteria
+**Actions**:
+- `validate-code`: Runs ESLint, Prettier, and TypeScript type checking
+- `security-scan`: Performs code security analysis using CodeQL
+- `dependency-check`: Scans for vulnerable dependencies using Dependabot
 
-## CI Pipeline Components
+**Permissions**:
+- GitHub: Read access to repository code
+- No AWS permissions required
 
-### Code Quality Checks
-- ESLint configuration
-- Code formatting (Prettier)
-- Static analysis tools
-- Security scanning
+### 2. Unit & Integration Test Workflow
+**Trigger**: Pull requests to main, pushes to feature branches
 
-### Unit Testing
-- Test framework configuration
-- Coverage requirements
-- Test data management
-- Mocking approach
+**Actions**:
+- `run-unit-tests`: Executes Jest/Mocha tests with coverage reporting
+- `run-integration-tests`: Tests API functionality against mock services
 
-### Integration Testing
-- API testing strategy
-- Mock service configuration
-- Environment setup/teardown
-- Idempotency considerations
+**Permissions**:
+- GitHub: Read access to repository code
+- No AWS permissions required
 
-### Infrastructure Validation
-- CloudFormation/SAM template validation
-- IAM policy analysis
-- Security best practice checks
-- Cost estimation
+### 3. Infrastructure Validation Workflow
+**Trigger**: Pull requests to main, changes to SAM/CloudFormation templates
 
-## CD Pipeline Components
+**Actions**:
+- `validate-sam`: Validates SAM templates syntax and structure
+- `cfn-nag`: Checks CloudFormation templates for security issues
+- `cfn-lint`: Lints CloudFormation templates for best practices
+- `iam-policy-check`: Analyzes IAM policies for least privilege violations
 
-### Environment Strategy
-- Development environment
-- Staging environment
-- Production environment
-- Environment promotion criteria
+**Permissions**:
+- GitHub: Read access to repository code
+- No AWS permissions required
 
-### Deployment Process
-- SAM deployment configuration
-- Rollback triggers
-- Blue/green deployment options
-- Canary deployment capabilities
+### 4. Development Deployment Workflow
+**Trigger**: Pushes to main branch, manual trigger
 
-### Post-Deployment Verification
-- Smoke testing
-- Synthetic transaction monitoring
-- Health check validation
-- Performance validation
+**Actions**:
+- `build-artifacts`: Compiles TypeScript, bundles Lambda functions
+- `deploy-dev`: Deploys to development environment using SAM
+- `run-smoke-tests`: Performs basic functionality verification
 
-## Security Controls
+**Permissions**:
+- GitHub: Read access to repository code, write access to GitHub artifacts
+- AWS: Short-lived credentials with permissions for:
+  - `cloudformation:*` on the dev stack resources
+  - `lambda:*` for function deployment
+  - `apigateway:*` for API configurations
+  - `iam:PassRole` for service roles
+  - `s3:*` for deployment artifacts bucket
+  - `dynamodb:*` for table creation/updates
+  - `logs:*` for CloudWatch log configuration
+  - `bedrock:InvokeModel` for testing
 
-### Secret Management
-- GitHub Secrets management
-- AWS parameter handling
-- Secure credential rotation
+### 5. Environment Deployment Workflow
+**Trigger**: 
+- Release branch creation (for staging)
+- Release publication (for production)
+- Manual trigger with environment selection
 
-### Pipeline Permissions
-- GitHub Action permissions
-- AWS deployment role configuration
-- Principle of least privilege implementation
+**Actions**:
+- `build-artifacts`: Compiles and packages code with production settings
+- `set-env-variables`: Determines environment-specific configuration
+- `create-backups`: Creates backups for production deployments
+- `deploy-environment`: Deploys to target environment using SAM
+- `run-tests`: Performs appropriate tests for the environment
+- `monitor-deployment`: For production, watches metrics and handles rollback if needed
 
-### Security Scanning
-- Dependency vulnerability scanning
-- Container scanning
-- Infrastructure as Code security analysis
-- Compliance verification
+**Permissions**:
+- GitHub: Read access to repository code, write access to GitHub artifacts
+- AWS: Short-lived credentials with permissions for:
+  - `cloudformation:*` on the environment stack resources
+  - `lambda:*` for function deployment
+  - `apigateway:*` for API configurations
+  - `iam:PassRole` for service roles
+  - `s3:*` for deployment artifacts bucket
+  - `dynamodb:*` for table operations including backups
+  - `logs:*` for CloudWatch log configuration
+  - `cloudwatch:*` for metrics and alarms
+  - `bedrock:InvokeModel` for testing
 
-## Notification and Feedback
+### 6. Cleanup/Teardown Workflow
+**Trigger**: Manual trigger, PR closure for ephemeral environments
 
-### Status Notifications
-- Build/deployment status alerts
-- Failure notifications
-- Success confirmations
+**Actions**:
+- `delete-stack`: Removes CloudFormation stack
+- `cleanup-artifacts`: Removes deployment artifacts from S3
 
-### Reporting
-- Pipeline metrics
-- Deployment frequency
-- Lead time tracking
-- Failure rate monitoring
+**Permissions**:
+- GitHub: Read access to repository code
+- AWS: Short-lived credentials with permissions for:
+  - `cloudformation:DeleteStack` for the target environment
+  - `s3:DeleteObject` for artifact cleanup
 
-## Disaster Recovery
+## AWS IAM Configuration
 
-### Pipeline Failure Recovery
-- Manual intervention procedures
-- Retry mechanisms
-- Failure documentation
+### OIDC Integration for GitHub Actions
+To avoid storing long-lived AWS credentials, the pipeline will use GitHub's OIDC provider to obtain short-lived AWS credentials:
 
-### Environment Recovery
-- Resource cleanup procedures
-- State recovery approach
-- Data integrity verification
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Federated": "arn:aws:iam::ACCOUNT_ID:oidc-provider/token.actions.githubusercontent.com"
+      },
+      "Action": "sts:AssumeRoleWithWebIdentity",
+      "Condition": {
+        "StringEquals": {
+          "token.actions.githubusercontent.com:sub": "repo:organization/repo-name:ref:refs/heads/main"
+        }
+      }
+    }
+  ]
+}
+```
 
-## Local Development Support
+### Role Structure
+- `bedrock-proxy-cicd-dev-role`: Used for development deployments
+- `bedrock-proxy-cicd-staging-role`: Used for staging deployments
+- `bedrock-proxy-cicd-prod-role`: Used for production deployments with stricter permissions
 
-### Local Testing
-- Local SAM configuration
-- Mock service setup
-- Environment variable handling
+Each role will have a trust relationship with the GitHub Actions OIDC provider and contain only the permissions required for that specific environment.
 
-### Pre-commit Hooks
-- Code linting
-- Format checking
-- Commit message validation
+## Secrets Management
 
-## Appendix
+### Required Secrets
+- `AWS_ROLE_TO_ASSUME`: ARN of the IAM role for GitHub Actions to assume
+- `OPENAI_API_KEY`: For integration testing
+- `TEST_ACCOUNT_ID`: For running tests against a test tenant
+- `ROLLBACK_SNS_TOPIC`: SNS topic ARN for production deployment alerts
 
-### GitHub Actions Workflow Examples
-- Build workflow example
-- Test workflow example
-- Deploy workflow example
+### Secrets Handling
+- All secrets stored as GitHub Actions secrets
+- Environment-specific secrets segregated using GitHub environments
+- No hard-coded credentials in code or workflows
+- Production credentials require manual approval from authorized users
 
-### Pipeline Diagrams
-- CI workflow visualization
-- CD workflow visualization
-- Environment promotion flow
+## Workflow Implementation
 
-### Reference Documentation
-- GitHub Actions documentation links
-- AWS SAM deployment references
-- Testing framework resources 
+The actual workflow implementation files are located in the `.github/workflows` directory:
+
+- `validate-code.yml` - Code validation workflow
+- `run-tests.yml` - Unit and integration tests
+- `validate-infrastructure.yml` - Infrastructure validation
+- `deploy-dev.yml` - Development environment deployment
+- `deploy-environment.yml` - Unified staging/production deployment
+- `cleanup.yml` - Environment cleanup and teardown 
