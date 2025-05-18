@@ -1,140 +1,178 @@
-# Observability Plan
+# CloudWatch Metrics Observability Plan
 
-## Overview
-- Observability goals
-- Key observability principles
-- Stakeholder requirements
+## Purpose
+This document outlines the implementation of AWS CloudWatch metrics for monitoring the AWS Bedrock OpenAI-compatible API proxy service, with specific focus on tracking:
+- Per-account usage and costs
+- API performance and reliability
+- Model usage patterns
+- Error rates and types
 
-## Logging Strategy
+## CloudWatch Metrics Implementation
 
-### Log Levels and Content
-- Log level definitions
-- Structured logging format
-- Sensitive data handling in logs
+### Standard Service Metrics
 
-### Log Aggregation
-- CloudWatch Logs configuration
-- Log retention periods
-- Log groups organization
+#### API Gateway Metrics
+| Metric Name | Description | Dimension | Statistical Function |
+|------------|-------------|-----------|---------------------|
+| Count | Total number of API requests | ApiId, Stage, Resource, Method | SUM |
+| Latency | Request latency in ms | ApiId, Stage, Resource, Method | AVG, P90, P99 |
+| IntegrationLatency | Backend processing latency | ApiId, Stage, Resource, Method | AVG, P90, P99 |
+| 4XXError | Client error count | ApiId, Stage, Resource, Method | SUM |
+| 5XXError | Server error count | ApiId, Stage, Resource, Method | SUM |
 
-### Log Analysis
-- CloudWatch Logs Insights queries
-- Common troubleshooting patterns
-- Log-based alerting
+#### Lambda Function Metrics
+| Metric Name | Description | Dimension | Statistical Function |
+|------------|-------------|-----------|---------------------|
+| Invocations | Number of function invocations | FunctionName | SUM |
+| Duration | Execution time in ms | FunctionName | AVG, MAX |
+| Errors | Number of failed executions | FunctionName | SUM |
+| Throttles | Number of throttled attempts | FunctionName | SUM |
+| ConcurrentExecutions | Concurrent executions count | FunctionName | MAX |
+| IteratorAge | Age of event in event source mappings | FunctionName | MAX |
 
-## Metrics Collection
+#### Bedrock API Metrics
+| Metric Name | Description | Dimension | Statistical Function |
+|------------|-------------|-----------|---------------------|
+| InvokeModel.Latency | Model invocation latency | Operation | AVG, P90, P99 |
+| InvokeModel.Invocations | Model invocation count | Operation, ModelId | SUM |
+| InvokeModel.ClientErrors | Client error count | Operation, ModelId | SUM |
+| InvokeModel.ServerErrors | Server error count | Operation, ModelId | SUM |
+| InvokeModel.Throttles | Throttling count | Operation, ModelId | SUM |
 
-### AWS Service Metrics
-- Lambda metrics
-- API Gateway metrics
-- Custom metrics
+### Custom Metrics
 
-### Application Metrics
-- Request/response metrics
-- Performance metrics
-- Business metrics
+#### Account Usage Metrics
+| Metric Name | Description | Dimensions | Statistical Function |
+|------------|-------------|------------|---------------------|
+| AccountApiRequests | API requests per account | AccountId, ApiEndpoint | SUM |
+| AccountBedrockCost | Estimated Bedrock cost per account | AccountId, ModelId | SUM |
+| AccountTokensInput | Input tokens per account | AccountId, ModelId | SUM |
+| AccountTokensOutput | Output tokens per account | AccountId, ModelId | SUM |
+| AccountErrorRate | Error rate percentage | AccountId, ErrorType | AVG |
 
-### Token Usage Metrics
-- Input token tracking
-- Output token tracking
-- Model-specific metrics
+#### Model Usage Metrics
+| Metric Name | Description | Dimensions | Statistical Function |
+|------------|-------------|------------|---------------------|
+| ModelInvocations | Model invocation count | ModelId, AccountId | SUM |
+| AverageTokensPerRequest | Average tokens per request | ModelId, RequestType | AVG |
+| ModelMappingUsage | Usage of each OpenAI to Bedrock mapping | OpenAIModel, BedrockModel | SUM |
+| ModelLatency | Model-specific latency | ModelId | AVG, P90, P99 |
 
-## Monitoring Dashboard
+## CloudWatch Logs Configuration
 
-### Operational Dashboard
-- Service health indicators
-- Error rates
-- Latency metrics
-- Cold start monitoring
+### Log Groups
+1. `/aws/apigateway/bedrock-proxy-api`
+2. `/aws/lambda/bedrock-proxy-handler`
+3. `/aws/lambda/bedrock-proxy-authorizer`
+4. `/aws/lambda/usage-metrics-processor`
 
-### Business Dashboard
-- Request volume
-- User activity
-- Model usage distribution
-- Cost indicators
+### Metric Filters
 
-### Performance Dashboard
-- Response times
-- Queue depths
-- Concurrency metrics
-- Throttling indicators
+#### Token Usage Filter
+```
+filter: [request_id, account_id, model_id, input_tokens, output_tokens, duration]
+metric: AccountTokenUsage
+dimensions: [AccountId, ModelId]
+```
 
-## Alerting Strategy
+#### Cost Estimation Filter
+```
+filter: [request_id, account_id, model_id, estimated_cost]
+metric: AccountCost
+dimensions: [AccountId, ModelId]
+```
 
-### Alert Definitions
-- Critical alerts
-- Warning alerts
-- Informational alerts
+#### Error Pattern Filter
+```
+filter: ?ERROR ?Error ?error
+metric: ServiceErrors
+dimensions: [ErrorType]
+```
 
-### Alert Channels
-- Email notifications
-- Slack/Teams integration
-- PagerDuty/OpsGenie integration
+## Implementation Details
 
-### Alert Remediation
-- Runbooks for common alerts
-- Escalation procedures
-- Auto-remediation opportunities
+### Custom Metrics Collection Approach
 
-## Distributed Tracing
+The custom metrics will be collected by adding metrics reporting functionality directly within the existing Lambda functions that handle API requests. This approach:
 
-### Trace Implementation
-- AWS X-Ray configuration
-- Trace sampling strategy
-- Custom subsegments
+1. **Integrates with Request Processing**: 
+   - Metrics collection occurs as part of normal request processing
+   - No separate service or middleware Lambda required
+   - Minimal performance impact on request handling
 
-### Correlation IDs
-- Request ID propagation
-- User/session correlation
-- Cross-service tracing
+2. **Captures Key Data Points**:
+   - Account ID from the authentication context
+   - Model ID from the request parameters
+   - Input and output token counts from Bedrock responses
+   - Calculated cost estimation based on token usage
 
-## Health Checks and Synthetic Monitoring
+3. **Publishing Method**:
+   - Uses AWS SDK to publish metrics to CloudWatch
+   - Batches metrics where possible to reduce API calls
+   - Includes structured logging for log-based metrics
 
-### Health Check Endpoints
-- Health check implementation
-- Deep health checks
-- Dependency health verification
+4. **Token Cost Calculation**:
+   - Maintains a configuration mapping of model IDs to token costs
+   - Calculates estimated costs for both input and output tokens
+   - Updates costs through configuration, not code changes
 
-### Synthetic Monitoring
-- CloudWatch Synthetics configuration
-- Test cases
-- Geographically distributed testing
+## CloudWatch Dashboards
 
-## Debugging Tools
+### Account Usage Dashboard
+- Widgets:
+  - Daily API requests by account (bar chart)
+  - Daily cost by account (bar chart)
+  - Tokens processed by account (line chart)
+  - Error rate by account (line chart)
 
-### Development Debugging
-- Local logging configuration
-- Debug mode implementation
-- Troubleshooting tools
+### API Performance Dashboard
+- Widgets:
+  - API latency by endpoint (line chart)
+  - Error rate by endpoint (line chart)
+  - Lambda execution duration (line chart)
+  - Concurrent Lambda executions (line chart)
 
-### Production Debugging
-- Safe debug capabilities
-- Diagnostic endpoints
-- Support information collection
+### Cost Analysis Dashboard
+- Widgets:
+  - Total Bedrock cost over time (line chart)
+  - Cost by model (pie chart)
+  - Cost by account (pie chart)
+  - Cost per request average (line chart)
+  
+## Alerts and Thresholds
 
-## Compliance and Audit
+### Critical Alerts
+- 5XX error rate > 1% (5-minute period)
+- API Latency P99 > 5000ms (5-minute period)
+- Lambda throttles > 10 (5-minute period)
+- Account cost > $X within 24 hours (threshold per account)
 
-### Audit Logging
-- Security event logging
-- Access logging
-- Configuration change tracking
+### Warning Alerts
+- 4XX error rate > 5% (5-minute period)
+- API Latency P90 > 2000ms (5-minute period)
+- Lambda duration > 5000ms (5-minute period)
+- Unusual spike in token usage (anomaly detection)
 
-### Compliance Reporting
-- Required compliance metrics
-- Automated report generation
-- Verification procedures
+## Implementation Schedule
 
-## Appendix
+1. **Phase 1: Basic Metrics** (Week 1)
+   - Configure standard CloudWatch metrics for all services
+   - Implement basic CloudWatch dashboards
+   - Set up critical alerts
 
-### CloudWatch Dashboard Templates
-- JSON templates for dashboards
-- Installation instructions
+2. **Phase 2: Custom Metrics** (Week 2)
+   - Implement Lambda middleware for custom metrics
+   - Create metric filters on log groups
+   - Set up account-specific dashboards
 
-### Common Queries
-- Useful CloudWatch Logs Insights queries
-- X-Ray query examples
+3. **Phase 3: Cost Analysis** (Week 3)
+   - Implement cost estimation logic
+   - Create cost analysis dashboard
+   - Configure cost-based alerts
 
-### References
-- AWS observability documentation
-- Serverless observability best practices
-- Troubleshooting guides 
+## Maintenance and Updates
+
+- Review and update token cost mappings monthly
+- Adjust alert thresholds based on usage patterns
+- Archive and rotate CloudWatch logs (7-day retention for raw logs)
+- Schedule quarterly review of metrics effectiveness 
