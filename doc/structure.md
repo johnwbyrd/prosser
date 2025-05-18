@@ -1,3 +1,4 @@
+```
 bedrock-mcp-proxy/
 │
 ├── .github/                           # GitHub configurations
@@ -91,3 +92,4 @@ bedrock-mcp-proxy/
 ├── samconfig.toml                     # SAM CLI configuration
 ├── README.md                          # Project overview
 └── LICENSE                            # Project license
+```
