@@ -1,0 +1,6 @@
+{
+  "Parameters": {
+    "Environment": "dev",
+    "DeploymentType": "ALL_AT_ONCE"
+  }
+} 

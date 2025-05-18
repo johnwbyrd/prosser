@@ -1,0 +1,47 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: AWS Bedrock OpenAI-compatible API proxy service
+
+Globals:
+  Function:
+    Timeout: 30
+    Runtime: nodejs18.x
+    Architectures:
+      - x86_64
+    Environment:
+      Variables:
+        NODE_ENV: !Ref Environment
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - staging
+      - production
+    Description: Deployment environment
+
+  DeploymentType:
+    Type: String
+    Default: ALL_AT_ONCE
+    AllowedValues:
+      - ALL_AT_ONCE
+      - CANARY
+      - ROLLBACK
+      - COMPLETE
+    Description: Deployment type for API Gateway
+
+Resources:
+  # API Gateway will be defined here
+  
+  # Lambda Functions will be defined here
+  
+  # DynamoDB Tables will be defined here
+  
+  # IAM Roles will be defined here
+
+Outputs:
+  ApiGatewayUrl:
+    Description: URL of the API Gateway endpoint
+    Value: !Sub https://${BedrockProxyApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment} 
